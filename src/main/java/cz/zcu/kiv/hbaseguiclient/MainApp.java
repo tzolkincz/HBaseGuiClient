@@ -1,4 +1,4 @@
-package zcu.kiv.hbaseclient;
+package cz.zcu.kiv.hbaseguiclient;
 
 import java.util.ArrayList;
 import java.util.List;

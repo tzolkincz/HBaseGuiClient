@@ -1,4 +1,4 @@
-package zcu.kiv.hbaseclient;
+package cz.zcu.kiv.hbaseguiclient;
 
 import javafx.event.EventHandler;
 import javafx.scene.control.TextField;
