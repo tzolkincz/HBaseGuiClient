@@ -1,14 +1,12 @@
 package cz.zcu.kiv.hbaseguiclient;
 
 import cz.zcu.kiv.hbaseguiclient.model.AppContext;
-import java.io.IOException;
-import java.util.logging.Level;
-import java.util.logging.Logger;
 import javafx.application.Application;
 import static javafx.application.Application.launch;
 import javafx.application.Platform;
 import javafx.event.EventHandler;
 import javafx.geometry.Insets;
+import javafx.scene.Node;
 import javafx.scene.Scene;
 import javafx.scene.control.Alert;
 import javafx.scene.control.Alert.AlertType;
@@ -24,6 +22,8 @@ import javafx.scene.layout.BorderPane;
 import javafx.stage.Stage;
 import javafx.scene.control.TreeItem;
 import javafx.scene.control.TreeView;
+import javafx.scene.image.Image;
+import javafx.scene.image.ImageView;
 import javafx.scene.input.MouseEvent;
 import javafx.scene.layout.GridPane;
 import javafx.scene.text.Text;
@@ -46,7 +46,7 @@ public class MainApp extends Application {
 
 	@Override
 	public void start(Stage stage) throws Exception {
-		
+
 		appContext = new AppContext();
 
 		createGui(stage);
@@ -67,7 +67,7 @@ public class MainApp extends Application {
 		MenuBar mainMenu = new MenuBar();
 		mainMenu.getMenus().addAll(
 				clickableMenuItemFactory("Connect", e -> showConnectPopUp()),
-				clickableMenuItemFactory("Create", e -> CreateTableDialog.showCreatePopUp()),
+				clickableMenuItemFactory("Create", e -> CreateTableDialog.showCreatePopUp(appContext)),
 				clickableMenuItemFactory("Copy", e -> showConnectPopUp()),
 				clickableMenuItemFactory("Exit", e -> Platform.exit())
 		);
@@ -107,60 +107,65 @@ public class MainApp extends Application {
 		dialog.getDialogPane().setContent(grid);
 
 		dialog.setResultConverter(dialogButton -> {
-			return new Pair<>(name.getText(), zk.getText());
+			return new Pair<>(zk.getText(), name.getText());
 		});
 
+		Node currentLeft = root.getLeft();
 		Pair<String, String> result = dialog.showAndWait().get();
-		try {
-			ProgressIndicator p1 = new ProgressIndicator();
-			//root.getChildren().add(p1);
-			root.setLeft(p1);
+		ProgressIndicator p1 = new ProgressIndicator();
+		root.setLeft(p1);
+		appContext.createConnection(result.getKey(), result.getValue(), (err, res) -> {
+			if (err != null) {
+				errorDialogFactory("Error, cant connect", "Cannot connect to cluster", err);
+				root.setLeft(currentLeft);
+				showConnectPopUp();
+			} else {
+				System.out.println("done");
+				appContext.refreshTables(res, (suc) -> {
+					if (suc == true) {
+						createClustersTreeView();
+					} else {
+						errorDialogFactory("Cant get list of tables", "Something went wrong", "Check out std out");
+					}
+				});
+			}
+		});
+	}
 
-
-			new Thread( () -> {
-				try {
-					Thread.sleep(10000);
-				} catch (InterruptedException ex) {
-					Logger.getLogger(MainApp.class.getName()).log(Level.SEVERE, null, ex);
-				}
-			}).start();
-
-			Thread.sleep(0, 1);
-
-
-//			appContext.createConnection(result.getKey(), result.getValue());
-//		} catch (IOException ex) {
-//			//open err dialog
-//			Alert alert = new Alert(AlertType.ERROR);
-//			alert.setTitle("Connection Error");
-//			alert.setHeaderText("Unable to connect to cluster");
-//			alert.setContentText(ex.getMessage());
-//			ex.printStackTrace();
-//			alert.showAndWait();
-		} catch (InterruptedException ex) {
-			Logger.getLogger(MainApp.class.getName()).log(Level.SEVERE, null, ex);
-		}
+	private void errorDialogFactory(String title, String header, String msg) {
+		Alert alert = new Alert(AlertType.ERROR);
+		alert.setTitle(title);
+		alert.setHeaderText(header);
+		alert.setContentText(msg);
+		alert.showAndWait();
 	}
 
 	private void createClustersTreeView() {
 		TreeView clustersTreeView = new TreeView();
+		TreeItem<String> rootTreeItem = new TreeItem<>("unshowable root");
 
 		appContext.getClusterTables().forEach((cluster, namespaceTablesMap) -> {
 			TreeItem<String> clusterTreeItem = new TreeItem(cluster);
 
 			namespaceTablesMap.forEach((namespace, tableList) -> {
 				TreeItem<String> namespaceTreeItem = new TreeItem<>(namespace);
+				namespaceTreeItem.setExpanded(true);
 
 				tableList.forEach(tableName -> {
 					TreeItem<String> tableTreeItem = new TreeItem<>(tableName);
+					tableTreeItem.setExpanded(true);
 					namespaceTreeItem.getChildren().add(tableTreeItem);
 				});
 
 				clusterTreeItem.getChildren().add(namespaceTreeItem);
 			});
 
-			clustersTreeView.setRoot(clusterTreeItem);
+			clusterTreeItem.setExpanded(true);
+			rootTreeItem.getChildren().add(clusterTreeItem);
 		});
+
+		clustersTreeView.setRoot(rootTreeItem);
+		clustersTreeView.setShowRoot(false);
 		root.setLeft(clustersTreeView);
 	}
 

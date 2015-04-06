@@ -1,5 +1,6 @@
 package cz.zcu.kiv.hbaseguiclient;
 
+import cz.zcu.kiv.hbaseguiclient.model.AppContext;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
@@ -96,7 +97,7 @@ public class CreateTableDialog {
 		return cfGrid;
 	}
 
-	public static void showCreatePopUp() {
+	public static void showCreatePopUp(AppContext appContext) {
 		Dialog<List<String>> dialog = new Dialog<>();
 		dialog.setTitle("Create new table");
 		GridPane grid = new GridPane();
@@ -111,15 +112,16 @@ public class CreateTableDialog {
 
 		TextField namespace = new TextField();
 		namespace.setPromptText("namespace");
+		namespace.setDisable(true);
 		grid.add(new Label("Table namespace:"), 2, 0);
 		grid.add(namespace, 3, 0);
 
 		ChoiceBox<String> atCluster = new ChoiceBox();
-		atCluster.getItems().addAll(
-				"Sencha",
-				"Piskovisko",
-				"Produkce");
-		atCluster.setValue("Sencha");
+		appContext.getClusterMap().forEach((k,v) ->{
+			atCluster.getItems().add(k);
+			atCluster.setValue(k);
+		});
+
 		grid.add(new Label("Select cluster:"), 0, 1);
 		grid.add(atCluster, 1, 1);
 
