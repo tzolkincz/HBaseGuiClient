@@ -52,6 +52,13 @@ public class CreateTableDialog {
 				"PREFIX_TREE");
 		dataBlockEncodingChoiceBox.setValue("FAST_DIFF");
 
+		/*
+		*
+		* @TODO bloomfilter
+		* @TODO compression
+		*
+		*
+		*/
 		cf.focusedProperty().addListener(focus -> {
 			if (((ReadOnlyBooleanProperty) focus).get() == false) {
 				//determine if add new cf
@@ -102,10 +109,10 @@ public class CreateTableDialog {
 		grid.add(new Label("Table name:"), 0, 0);
 		grid.add(name, 1, 0);
 
-		TextField schema = new TextField();
-		schema.setPromptText("schema");
-		grid.add(new Label("Table schema:"), 2, 0);
-		grid.add(schema, 3, 0);
+		TextField namespace = new TextField();
+		namespace.setPromptText("namespace");
+		grid.add(new Label("Table namespace:"), 2, 0);
+		grid.add(namespace, 3, 0);
 
 		ChoiceBox<String> atCluster = new ChoiceBox();
 		atCluster.getItems().addAll(
