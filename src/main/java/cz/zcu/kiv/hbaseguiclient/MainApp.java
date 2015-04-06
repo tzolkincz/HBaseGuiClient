@@ -1,5 +1,6 @@
 package cz.zcu.kiv.hbaseguiclient;
 
+import com.google.common.base.Throwables;
 import cz.zcu.kiv.hbaseguiclient.model.AppContext;
 import javafx.application.Application;
 import static javafx.application.Application.launch;
@@ -121,11 +122,11 @@ public class MainApp extends Application {
 				showConnectPopUp();
 			} else {
 				System.out.println("done");
-				appContext.refreshTables(res, (suc) -> {
+				appContext.refreshTables(res, (suc, ex) -> {
 					if (suc == true) {
 						createClustersTreeView();
 					} else {
-						errorDialogFactory("Cant get list of tables", "Something went wrong", "Check out std out");
+						errorDialogFactory("Cant get list of tables", ex.getMessage(), Throwables.getStackTraceAsString(ex));
 					}
 				});
 			}

@@ -26,7 +26,7 @@ public class CreateTableDialog {
 
 	final static AtomicInteger countOfCFs = new AtomicInteger(0);
 	static List<TextField> cfNamesList = new ArrayList<>();
-	static int cfPropertiesHeight = 3;
+	static int cfPropertiesHeight = 4;
 	static int cfPropertiesOffset = 3;
 
 	private static GridPane cfPropertiesFactory(GridPane grid) {
@@ -36,7 +36,6 @@ public class CreateTableDialog {
 		cfGrid.setPadding(new Insets(20, 150, 10, 10));
 		cfGrid.setBorder(new Border(
 				new BorderStroke(Color.GRAY, BorderStrokeStyle.SOLID, new CornerRadii(15), BorderWidths.DEFAULT)));
-
 
 		TextField cf = new TextField();
 		cf.setPromptText("cf");
@@ -53,13 +52,6 @@ public class CreateTableDialog {
 				"PREFIX_TREE");
 		dataBlockEncodingChoiceBox.setValue("FAST_DIFF");
 
-		/*
-		*
-		* @TODO bloomfilter
-		* @TODO compression
-		*
-		*
-		*/
 		cf.focusedProperty().addListener(focus -> {
 			if (((ReadOnlyBooleanProperty) focus).get() == false) {
 				//determine if add new cf
@@ -94,6 +86,26 @@ public class CreateTableDialog {
 		cfGrid.add(new Label("TTL (sec):"), 0, 3);
 		cfGrid.add(ttl, 1, 3);
 
+		ChoiceBox<String> bloomFilterChoiceBox = new ChoiceBox();
+		bloomFilterChoiceBox.getItems().addAll(
+				"NONE",
+				"ROW",
+				"ROWCOL");
+		bloomFilterChoiceBox.setValue("NONE");
+		cfGrid.add(new Label("Bloom filter"), 0, 4);
+		cfGrid.add(bloomFilterChoiceBox, 1, 4);
+
+		ChoiceBox<String> compressionChoiceBox = new ChoiceBox();
+		compressionChoiceBox.getItems().addAll(
+				"NONE",
+				"SNAPPY",
+				"LZO",
+				"LZ4",
+				"GZ");
+		compressionChoiceBox.setValue("SNAPPY");
+		cfGrid.add(new Label("Compression"), 2, 3);
+		cfGrid.add(compressionChoiceBox, 3, 3);
+
 		return cfGrid;
 	}
 
@@ -117,7 +129,7 @@ public class CreateTableDialog {
 		grid.add(namespace, 3, 0);
 
 		ChoiceBox<String> atCluster = new ChoiceBox();
-		appContext.getClusterMap().forEach((k,v) ->{
+		appContext.getClusterMap().forEach((k, v) -> {
 			atCluster.getItems().add(k);
 			atCluster.setValue(k);
 		});
@@ -130,18 +142,15 @@ public class CreateTableDialog {
 		grid.add(new Label("Presplits:"), 2, 1);
 		grid.add(presplits, 3, 1);
 
-
 		TextField startKey = new TextField();
 		startKey.setPromptText("8000");
 		grid.add(new Label("Start key (hex):"), 0, 2);
 		grid.add(startKey, 1, 2);
 
-
 		TextField endKey = new TextField();
 		endKey.setPromptText("80FF");
 		grid.add(new Label("End key (hex):"), 2, 2);
 		grid.add(endKey, 3, 2);
-
 
 		grid.add(cfPropertiesFactory(grid), 0, cfPropertiesOffset, 4, 3);
 

@@ -33,9 +33,9 @@ public class AppContext {
 		Platform.runLater(() -> {
 			Configuration conf = new Configuration();
 			conf.set("hbase.zookeeper.quorum", zk);
-			conf.set("zookeeper.session.timeout", "600");
-			conf.set("hbase.client.operation.timeout", "600");
-			conf.set("hbase.rpc.timeout", "600");
+			conf.set("zookeeper.session.timeout", "6000");
+			conf.set("hbase.client.operation.timeout", "6000");
+			conf.set("hbase.rpc.timeout", "6000");
 			conf.set("hbase.client.retries.number", "1");
 			conf.set("zookeeper.recovery.retry", "1");
 
@@ -59,13 +59,12 @@ public class AppContext {
 				clusterMap.put(clusterAlias, new Pair<>(connection, admin));
 				callback.accept(null, clusterAlias);
 			} catch (IOException e) {
-				e.printStackTrace();
 				callback.accept(Throwables.getStackTraceAsString(e), null);
 			}
 		});
 	}
 
-	public void refreshTables(String clusterName, Consumer<Boolean> callback) {
+	public void refreshTables(String clusterName, BiConsumer<Boolean, Exception> callback) {
 		Platform.runLater(() -> {
 			try {
 				//@TODO table namespace (HBase 1.0+)
@@ -78,9 +77,9 @@ public class AppContext {
 				}
 				namespaceMap.put("default", defaultNamespaceTables);
 				clusterTables.put(clusterName, namespaceMap);
-				callback.accept(true);
+				callback.accept(true, null);
 			} catch (IOException ex) {
-				callback.accept(false);
+				callback.accept(false, ex);
 			}
 		});
 	}
