@@ -7,25 +7,29 @@ import static javafx.application.Application.launch;
 import javafx.application.Platform;
 import javafx.event.EventHandler;
 import javafx.geometry.Insets;
+import javafx.geometry.Pos;
 import javafx.scene.Node;
 import javafx.scene.Scene;
 import javafx.scene.control.Alert;
 import javafx.scene.control.Alert.AlertType;
+import javafx.scene.control.Button;
 import javafx.scene.control.ButtonBar;
 import javafx.scene.control.ButtonType;
+import javafx.scene.control.CheckBox;
 import javafx.scene.control.Dialog;
 import javafx.scene.control.Label;
 import javafx.scene.control.Menu;
 import javafx.scene.control.MenuBar;
 import javafx.scene.control.ProgressIndicator;
+import javafx.scene.control.TableView;
+import javafx.scene.control.TextArea;
 import javafx.scene.control.TextField;
 import javafx.scene.layout.BorderPane;
 import javafx.stage.Stage;
 import javafx.scene.control.TreeItem;
 import javafx.scene.control.TreeView;
-import javafx.scene.image.Image;
-import javafx.scene.image.ImageView;
 import javafx.scene.input.MouseEvent;
+import javafx.scene.layout.Border;
 import javafx.scene.layout.GridPane;
 import javafx.scene.text.Text;
 import javafx.util.Pair;
@@ -53,6 +57,7 @@ public class MainApp extends Application {
 		createGui(stage);
 		createHeader();
 		createClustersTreeView();
+		createCli();
 	}
 
 	private void createGui(Stage stage) {
@@ -168,6 +173,27 @@ public class MainApp extends Application {
 		clustersTreeView.setRoot(rootTreeItem);
 		clustersTreeView.setShowRoot(false);
 		root.setLeft(clustersTreeView);
+	}
+
+	private void createCli() {
+
+		GridPane cliGrid = new GridPane();
+
+		TextArea commandTextArea = new TextArea("scan 'Table', LIMIT => 10");
+		cliGrid.add(commandTextArea, 0, 0, 5, 2);
+
+		CheckBox phoenixDataTypeCheckBox = new CheckBox("Phoenix data types converison");
+		cliGrid.add(phoenixDataTypeCheckBox, 0, 2, 4, 1);
+
+		Button submitCommandButton = new Button("Execute command");
+		cliGrid.add(submitCommandButton, 4, 2);
+		submitCommandButton.setAlignment(Pos.BASELINE_RIGHT);
+
+		cliGrid.setGridLinesVisible(true);
+
+		TableView commandTableView = new TableView();
+
+		root.setCenter(cliGrid);
 	}
 
 }

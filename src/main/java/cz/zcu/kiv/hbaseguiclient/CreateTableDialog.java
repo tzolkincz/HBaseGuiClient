@@ -9,6 +9,7 @@ import javafx.beans.property.ReadOnlyBooleanProperty;
 import javafx.geometry.Insets;
 import javafx.scene.control.ButtonBar;
 import javafx.scene.control.ButtonType;
+import javafx.scene.control.CheckBox;
 import javafx.scene.control.ChoiceBox;
 import javafx.scene.control.Dialog;
 import javafx.scene.control.Label;
@@ -106,6 +107,10 @@ public class CreateTableDialog {
 		cfGrid.add(new Label("Compression"), 2, 3);
 		cfGrid.add(compressionChoiceBox, 3, 3);
 
+		CheckBox inMemoryCheckBox = new CheckBox();
+		cfGrid.add(new Label("In memory"), 2, 4);
+		cfGrid.add(inMemoryCheckBox, 3, 4);
+		
 		return cfGrid;
 	}
 
