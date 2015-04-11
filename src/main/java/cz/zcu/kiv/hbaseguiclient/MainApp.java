@@ -2,9 +2,14 @@ package cz.zcu.kiv.hbaseguiclient;
 
 import com.google.common.base.Throwables;
 import cz.zcu.kiv.hbaseguiclient.model.AppContext;
+import cz.zcu.kiv.hbaseguiclient.model.TableRowDataModel;
+import java.util.stream.IntStream;
 import javafx.application.Application;
 import static javafx.application.Application.launch;
 import javafx.application.Platform;
+import javafx.beans.property.SimpleStringProperty;
+import javafx.collections.FXCollections;
+import javafx.collections.ObservableList;
 import javafx.event.EventHandler;
 import javafx.geometry.Insets;
 import javafx.geometry.Pos;
@@ -21,6 +26,8 @@ import javafx.scene.control.Label;
 import javafx.scene.control.Menu;
 import javafx.scene.control.MenuBar;
 import javafx.scene.control.ProgressIndicator;
+import javafx.scene.control.TableColumn;
+import javafx.scene.control.TableColumn.CellEditEvent;
 import javafx.scene.control.TableView;
 import javafx.scene.control.TextArea;
 import javafx.scene.control.TextField;
@@ -28,8 +35,8 @@ import javafx.scene.layout.BorderPane;
 import javafx.stage.Stage;
 import javafx.scene.control.TreeItem;
 import javafx.scene.control.TreeView;
+import javafx.scene.control.cell.TextFieldTableCell;
 import javafx.scene.input.MouseEvent;
-import javafx.scene.layout.Border;
 import javafx.scene.layout.GridPane;
 import javafx.scene.text.Text;
 import javafx.util.Pair;
@@ -176,7 +183,6 @@ public class MainApp extends Application {
 	}
 
 	private void createCli() {
-
 		GridPane cliGrid = new GridPane();
 
 		TextArea commandTextArea = new TextArea("scan 'Table', LIMIT => 10");
@@ -187,11 +193,42 @@ public class MainApp extends Application {
 
 		Button submitCommandButton = new Button("Execute command");
 		cliGrid.add(submitCommandButton, 4, 2);
-		submitCommandButton.setAlignment(Pos.BASELINE_RIGHT);
+		submitCommandButton.setAlignment(Pos.CENTER_RIGHT);
 
 		cliGrid.setGridLinesVisible(true);
 
-		TableView commandTableView = new TableView();
+		TableView<TableRowDataModel> commandTableView = new TableView<>();
+		TableColumn<TableRowDataModel, String>[] tableColumns = new TableColumn[10];
+
+		IntStream.iterate(0, x -> x + 1).limit(tableColumns.length).forEach(i -> {
+			tableColumns[i] = new TableColumn<>(String.valueOf(i));
+			tableColumns[i].setCellValueFactory(c -> {
+				return new SimpleStringProperty(c.getValue().getValues().get(i));
+			});
+
+			if (i != 0) { //row key is not modifiable
+				tableColumns[i].setCellFactory(TextFieldTableCell.<TableRowDataModel>forTableColumn());
+				tableColumns[i].setOnEditCommit(
+						(CellEditEvent<TableRowDataModel, String> t) -> {
+							((TableRowDataModel) t.getTableView().getItems().get(t.getTablePosition().getRow()))
+							.getValues().set(i, t.getNewValue());
+						});
+			}
+		});
+
+		commandTableView.getColumns().addAll(tableColumns);
+
+		//  which will make your table view dynamic
+		ObservableList<TableRowDataModel> tableData = FXCollections.observableArrayList();
+
+		tableData.add(new TableRowDataModel());
+		tableData.add(new TableRowDataModel());
+		tableData.add(new TableRowDataModel());
+
+		commandTableView.setItems(tableData);
+		commandTableView.setEditable(true);
+
+		cliGrid.add(commandTableView, 0, 3, 5, 5);
 
 		root.setCenter(cliGrid);
 	}
