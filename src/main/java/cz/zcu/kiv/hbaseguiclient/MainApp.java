@@ -2,6 +2,7 @@ package cz.zcu.kiv.hbaseguiclient;
 
 import com.google.common.base.Throwables;
 import cz.zcu.kiv.hbaseguiclient.model.AppContext;
+import cz.zcu.kiv.hbaseguiclient.model.CommandModel;
 import cz.zcu.kiv.hbaseguiclient.model.TableRowDataModel;
 import java.util.stream.IntStream;
 import javafx.application.Application;
@@ -10,6 +11,7 @@ import javafx.application.Platform;
 import javafx.beans.property.SimpleStringProperty;
 import javafx.collections.FXCollections;
 import javafx.collections.ObservableList;
+import javafx.concurrent.Task;
 import javafx.event.EventHandler;
 import javafx.geometry.Insets;
 import javafx.geometry.Pos;
@@ -38,6 +40,7 @@ import javafx.scene.control.TreeView;
 import javafx.scene.control.cell.TextFieldTableCell;
 import javafx.scene.input.MouseEvent;
 import javafx.scene.layout.GridPane;
+import javafx.scene.layout.HBox;
 import javafx.scene.text.Text;
 import javafx.util.Pair;
 
@@ -46,6 +49,7 @@ public class MainApp extends Application {
 	BorderPane root;
 	Scene scene;
 	AppContext appContext;
+	TableView commandTableView = getCommandTableView();
 
 	/**
 	 * failover for true java fx apps
@@ -131,7 +135,6 @@ public class MainApp extends Application {
 			if (err != null) {
 				errorDialogFactory("Error, cant connect", "Cannot connect to cluster", err);
 				root.setLeft(currentLeft);
-				showConnectPopUp();
 			} else {
 				System.out.println("done");
 				appContext.refreshTables(res, (suc, ex) -> {
@@ -185,22 +188,69 @@ public class MainApp extends Application {
 	private void createCli() {
 		GridPane cliGrid = new GridPane();
 
-		TextArea commandTextArea = new TextArea("scan 'Table', LIMIT => 10");
+		TextArea commandTextArea = new TextArea("scan table");
 		cliGrid.add(commandTextArea, 0, 0, 5, 2);
 
 		CheckBox phoenixDataTypeCheckBox = new CheckBox("Phoenix data types converison");
 		cliGrid.add(phoenixDataTypeCheckBox, 0, 2, 4, 1);
 
+		cliGrid.add(commandTableView, 0, 3, 5, 5);
+
 		Button submitCommandButton = new Button("Execute command");
-		cliGrid.add(submitCommandButton, 4, 2);
 		submitCommandButton.setAlignment(Pos.CENTER_RIGHT);
+		submitCommandButton.setOnAction(a -> {
+			ProgressIndicator pi = new ProgressIndicator();
+			cliGrid.add(pi, 0, 3, 5, 5);
+
+			final Task<String> t = new Task<String>() {
+
+				@Override
+				protected String call() throws Exception {
+
+					String res = CommandModel.submitQuery(commandTextArea.getText());
+					Platform.runLater(() -> {
+						if (res != null) {
+							errorDialogFactory("Error submitting command", "There is some issue with command", res);
+						}
+						System.out.println("test");
+						cliGrid.getChildren().remove(pi);
+						fillCommandTableViewContent();
+					});
+					return "hovnoto";
+				}
+			};
+
+			submitCommandButton.disableProperty().bind(t.runningProperty());
+			t.stateProperty().addListener(state -> {
+				System.out.println("state changed: " + state);
+			});
+
+			Thread tr = new Thread(t);
+			tr.setDaemon(true);
+			tr.start();
+
+		});
+		cliGrid.add(submitCommandButton, 4, 2);
 
 		cliGrid.setGridLinesVisible(true);
 
+		root.setCenter(cliGrid);
+	}
+
+	private TableView<TableRowDataModel> getCommandTableView() {
 		TableView<TableRowDataModel> commandTableView = new TableView<>();
+
+		commandTableView.setEditable(true);
+
+		return commandTableView;
+	}
+
+	private void fillCommandTableViewContent() {
+
 		TableColumn<TableRowDataModel, String>[] tableColumns = new TableColumn[10];
 
-		IntStream.iterate(0, x -> x + 1).limit(tableColumns.length).forEach(i -> {
+
+		IntStream.range(0, tableColumns.length).forEach(i -> {
 			tableColumns[i] = new TableColumn<>(String.valueOf(i));
 			tableColumns[i].setCellValueFactory(c -> {
 				return new SimpleStringProperty(c.getValue().getValues().get(i));
@@ -218,7 +268,6 @@ public class MainApp extends Application {
 
 		commandTableView.getColumns().addAll(tableColumns);
 
-		//  which will make your table view dynamic
 		ObservableList<TableRowDataModel> tableData = FXCollections.observableArrayList();
 
 		tableData.add(new TableRowDataModel());
@@ -226,11 +275,6 @@ public class MainApp extends Application {
 		tableData.add(new TableRowDataModel());
 
 		commandTableView.setItems(tableData);
-		commandTableView.setEditable(true);
-
-		cliGrid.add(commandTableView, 0, 3, 5, 5);
-
-		root.setCenter(cliGrid);
 	}
 
 }

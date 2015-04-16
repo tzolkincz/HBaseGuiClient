@@ -18,8 +18,8 @@ import org.apache.hadoop.hbase.client.HConnectionManager;
 
 public class AppContext {
 
-	ConcurrentHashMap<String, Pair<HConnection, HBaseAdmin>> clusterMap = new ConcurrentHashMap<>();
-	Map<String, Map<String, List<String>>> clusterTables = new HashMap<>();
+	static ConcurrentHashMap<String, Pair<HConnection, HBaseAdmin>> clusterMap = new ConcurrentHashMap<>();
+	static Map<String, Map<String, List<String>>> clusterTables = new HashMap<>();
 
 	public void createConnection(final String zk, final String clusterName, BiConsumer<String, String> callback) {
 		if (zk.isEmpty()) {
