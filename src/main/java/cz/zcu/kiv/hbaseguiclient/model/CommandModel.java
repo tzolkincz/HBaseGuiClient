@@ -1,30 +1,38 @@
 package cz.zcu.kiv.hbaseguiclient.model;
 
 import java.io.IOException;
-import java.util.logging.Level;
-import java.util.logging.Logger;
+import java.util.HashMap;
+import java.util.Map;
+import java.util.Set;
+import java.util.TreeMap;
+import java.util.TreeSet;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import org.apache.hadoop.hbase.client.HConnection;
 import org.apache.hadoop.hbase.client.HTableInterface;
-import org.apache.hadoop.hbase.client.Result;
 import org.apache.hadoop.hbase.client.ResultScanner;
 import org.apache.hadoop.hbase.client.Scan;
+import org.apache.hadoop.hbase.filter.PageFilter;
 import org.apache.hadoop.hbase.util.Bytes;
 
 public class CommandModel {
 
+	static Map<String, Map<String, String>> queryResult;
+	static Set<String> columns;
+
+	public static Map<String, Map<String, String>> getQueryResult() {
+		return queryResult;
+	}
+
+	public static Set<String> getColumns() {
+		return columns;
+	}
+
 	//@TODO gramatics
-	static Pattern scanPattern = Pattern.compile("\\s*scan\\s+(?<table>[\\w:.]+)(\\s+start\\s+(?<start>[\\w\\s]+))(\\s+skip\\s+(?<skip>\\d+))(\\s+limit\\s+(?<limit>\\d+))?\\s*",
+	static Pattern scanPattern = Pattern.compile("\\s*scan\\s+(?<table>[\\w:.]+)(\\s+start\\s+(?<start>[\\w\\s]+))?(\\s+skip\\s+(?<skip>\\d+))?(\\s+limit\\s+(?<limit>\\d+))?\\s*",
 			Pattern.CASE_INSENSITIVE);
 
 	public static String submitQuery(String text) throws IOException {
-
-		try {
-			Thread.sleep(2000L);
-		} catch (InterruptedException ex) {
-			Logger.getLogger(CommandModel.class.getName()).log(Level.SEVERE, null, ex);
-		}
 
 		Matcher m = scanPattern.matcher(text);
 
@@ -59,7 +67,7 @@ public class CommandModel {
 				return "Table not found at cluster " + cluster;
 			}
 
-			createScan(cluster, table, start, skip, limit);
+			execScan(cluster, table, start, skip, limit);
 
 			//@TODO table namespace (HBase v1.0+)
 			return null;
@@ -75,8 +83,12 @@ public class CommandModel {
 		return null;
 	}
 
-	private static void createScan(String cluster, String table, String start, String skip, String limit) throws IOException {
+	private static void execScan(String cluster, String table, String start, String skip, String limit) throws IOException {
 		Scan scan = new Scan();
+//		scan.setCaching(10);
+//		scan.setBatch(100);
+		scan.setMaxResultSize(1 * 1024 * 1024); //1MB
+
 		if (start != null) {
 			scan.setStartRow(Bytes.toBytes(start));
 		}
@@ -84,7 +96,8 @@ public class CommandModel {
 		if (limit == null) {
 			limit = "40";
 		}
-		scan.setMaxResultsPerColumnFamily(Integer.parseInt(limit));
+		scan.setFilter(new PageFilter(Integer.parseInt(limit)));
+
 		if (skip != null) {
 			scan.setRowOffsetPerColumnFamily(Integer.parseInt(skip));
 		}
@@ -92,11 +105,32 @@ public class CommandModel {
 		HConnection connection = AppContext.clusterMap.get(cluster).getKey();
 		HTableInterface tableInterface = connection.getTable(table);
 
+		//rowKey cf:cq	value
+		queryResult = new TreeMap<>();
+		columns = new TreeSet<>(); //store all columns from result (some could be null in first line)
+
+		System.out.println("Scan settings: " + scan.toString());
 		ResultScanner resultScanner = tableInterface.getScanner(scan);
-		resultScanner.iterator().forEachRemaining( res -> {
-			res.getNoVersionMap().forEach( (family, kv) -> {
-				
+		System.out.println("scan done");
+
+		resultScanner.iterator().forEachRemaining(res -> {
+
+			Map<String, String> columnValues = new HashMap<>();
+
+			res.getNoVersionMap().forEach((familyBytes, qualifierValue) -> {
+				String family = Bytes.toString(familyBytes);
+				qualifierValue.forEach((qualifierBytes, valueBytes) -> {
+
+					String qualifier = Bytes.toString(qualifierBytes);
+					String value = Bytes.toString(valueBytes);
+
+					columns.add(family + ":" + qualifier);
+					columnValues.put(family + ":" + qualifier, value);
+				});
 			});
+
+			String rk = Bytes.toString(res.getRow());
+			queryResult.put(rk, columnValues);
 		});
 	}
 

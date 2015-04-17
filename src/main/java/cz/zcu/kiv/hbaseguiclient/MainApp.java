@@ -4,7 +4,6 @@ import com.google.common.base.Throwables;
 import cz.zcu.kiv.hbaseguiclient.model.AppContext;
 import cz.zcu.kiv.hbaseguiclient.model.CommandModel;
 import cz.zcu.kiv.hbaseguiclient.model.TableRowDataModel;
-import java.util.stream.IntStream;
 import javafx.application.Application;
 import static javafx.application.Application.launch;
 import javafx.application.Platform;
@@ -40,7 +39,6 @@ import javafx.scene.control.TreeView;
 import javafx.scene.control.cell.TextFieldTableCell;
 import javafx.scene.input.MouseEvent;
 import javafx.scene.layout.GridPane;
-import javafx.scene.layout.HBox;
 import javafx.scene.text.Text;
 import javafx.util.Pair;
 
@@ -136,7 +134,6 @@ public class MainApp extends Application {
 				errorDialogFactory("Error, cant connect", "Cannot connect to cluster", err);
 				root.setLeft(currentLeft);
 			} else {
-				System.out.println("done");
 				appContext.refreshTables(res, (suc, ex) -> {
 					if (suc == true) {
 						createClustersTreeView();
@@ -206,13 +203,11 @@ public class MainApp extends Application {
 
 				@Override
 				protected String call() throws Exception {
-
 					String res = CommandModel.submitQuery(commandTextArea.getText());
 					Platform.runLater(() -> {
 						if (res != null) {
 							errorDialogFactory("Error submitting command", "There is some issue with command", res);
 						}
-						System.out.println("test");
 						cliGrid.getChildren().remove(pi);
 						fillCommandTableViewContent();
 					});
@@ -221,9 +216,6 @@ public class MainApp extends Application {
 			};
 
 			submitCommandButton.disableProperty().bind(t.runningProperty());
-			t.stateProperty().addListener(state -> {
-				System.out.println("state changed: " + state);
-			});
 
 			Thread tr = new Thread(t);
 			tr.setDaemon(true);
@@ -238,41 +230,49 @@ public class MainApp extends Application {
 	}
 
 	private TableView<TableRowDataModel> getCommandTableView() {
-		TableView<TableRowDataModel> commandTableView = new TableView<>();
-
-		commandTableView.setEditable(true);
-
-		return commandTableView;
+		TableView<TableRowDataModel> table = new TableView<>();
+		table.setEditable(true);
+		return table;
 	}
 
 	private void fillCommandTableViewContent() {
+		if (CommandModel.getColumns() == null) {
+			return;
+		}
 
-		TableColumn<TableRowDataModel, String>[] tableColumns = new TableColumn[10];
+		//remove all columns
+		commandTableView.getColumns().clear();
 
+		//add rowKey column
+		TableColumn<TableRowDataModel, String> rowKeyColumn = new TableColumn<>("Row key (immutable)");
+		rowKeyColumn.setCellValueFactory(c -> {
+			return new SimpleStringProperty(c.getValue().getRowKey());
+		});
+		commandTableView.getColumns().add(rowKeyColumn);
 
-		IntStream.range(0, tableColumns.length).forEach(i -> {
-			tableColumns[i] = new TableColumn<>(String.valueOf(i));
-			tableColumns[i].setCellValueFactory(c -> {
-				return new SimpleStringProperty(c.getValue().getValues().get(i));
+		//add data columns
+		CommandModel.getColumns().forEach(columnName -> {
+			TableColumn<TableRowDataModel, String> tableColumn = new TableColumn<>(columnName);
+
+			tableColumn.setCellValueFactory(c -> {
+				return new SimpleStringProperty(c.getValue().getValue(columnName));
 			});
 
-			if (i != 0) { //row key is not modifiable
-				tableColumns[i].setCellFactory(TextFieldTableCell.<TableRowDataModel>forTableColumn());
-				tableColumns[i].setOnEditCommit(
-						(CellEditEvent<TableRowDataModel, String> t) -> {
-							((TableRowDataModel) t.getTableView().getItems().get(t.getTablePosition().getRow()))
-							.getValues().set(i, t.getNewValue());
-						});
-			}
+			tableColumn.setCellFactory(TextFieldTableCell.<TableRowDataModel>forTableColumn());
+			tableColumn.setOnEditCommit(
+					(CellEditEvent<TableRowDataModel, String> t) -> {
+						((TableRowDataModel) t.getTableView().getItems().get(t.getTablePosition().getRow()))
+						.setValue(columnName, t.getNewValue());
+					});
+			commandTableView.getColumns().add(tableColumn);
+
 		});
 
-		commandTableView.getColumns().addAll(tableColumns);
-
+		//set data
 		ObservableList<TableRowDataModel> tableData = FXCollections.observableArrayList();
-
-		tableData.add(new TableRowDataModel());
-		tableData.add(new TableRowDataModel());
-		tableData.add(new TableRowDataModel());
+		CommandModel.getQueryResult().forEach((rowKey, kv) -> {
+			tableData.add(new TableRowDataModel(rowKey, kv));
+		});
 
 		commandTableView.setItems(tableData);
 	}

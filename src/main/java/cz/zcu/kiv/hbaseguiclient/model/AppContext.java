@@ -31,8 +31,8 @@ public class AppContext {
 			Configuration conf = new Configuration();
 			conf.set("hbase.zookeeper.quorum", zk);
 			conf.set("zookeeper.session.timeout", "6000");
-			conf.set("hbase.client.operation.timeout", "6000");
-			conf.set("hbase.rpc.timeout", "6000");
+			conf.set("hbase.client.operation.timeout", "2000");
+			conf.set("hbase.rpc.timeout", "2000");
 			conf.set("hbase.client.retries.number", "1");
 			conf.set("zookeeper.recovery.retry", "1");
 
