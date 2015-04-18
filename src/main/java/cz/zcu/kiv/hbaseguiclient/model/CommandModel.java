@@ -32,7 +32,7 @@ public class CommandModel {
 	static Pattern scanPattern = Pattern.compile("\\s*scan\\s+(?<table>[\\w:.]+)(\\s+start\\s+(?<start>[\\w\\s]+))?(\\s+skip\\s+(?<skip>\\d+))?(\\s+limit\\s+(?<limit>\\d+))?\\s*",
 			Pattern.CASE_INSENSITIVE);
 
-	public static String submitQuery(String text) throws IOException {
+	public static String submitQuery(String text, boolean hexConversion) throws IOException {
 
 		Matcher m = scanPattern.matcher(text);
 
@@ -67,7 +67,7 @@ public class CommandModel {
 				return "Table not found at cluster " + cluster;
 			}
 
-			execScan(cluster, table, start, skip, limit);
+			execScan(cluster, table, start, skip, limit, hexConversion);
 
 			//@TODO table namespace (HBase v1.0+)
 			return null;
@@ -83,7 +83,7 @@ public class CommandModel {
 		return null;
 	}
 
-	private static void execScan(String cluster, String table, String start, String skip, String limit) throws IOException {
+	private static void execScan(String cluster, String table, String start, String skip, String limit, boolean hexConversion) throws IOException {
 		Scan scan = new Scan();
 		scan.setCaching(60);
 		scan.setMaxResultSize(1 * 1024 * 1024); //1MB
@@ -108,9 +108,7 @@ public class CommandModel {
 		queryResult = new TreeMap<>();
 		columns = new TreeSet<>(); //store all columns from result (some could be null in first line)
 
-		System.out.println("Scan settings: " + scan.toString());
 		ResultScanner resultScanner = tableInterface.getScanner(scan);
-		System.out.println("scan done");
 
 		resultScanner.iterator().forEachRemaining(res -> {
 
@@ -121,7 +119,12 @@ public class CommandModel {
 				qualifierValue.forEach((qualifierBytes, valueBytes) -> {
 
 					String qualifier = Bytes.toString(qualifierBytes);
-					String value = Bytes.toString(valueBytes);
+					String value;
+					if (hexConversion) {
+						value = Bytes.toHex(valueBytes);
+					} else {
+						value = Bytes.toString(valueBytes);
+					}
 
 					columns.add(family + ":" + qualifier);
 					columnValues.put(family + ":" + qualifier, value);

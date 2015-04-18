@@ -195,8 +195,8 @@ public class MainApp extends Application {
 		TextArea commandTextArea = new TextArea("scan table");
 		cliGrid.add(commandTextArea, 0, 0, 5, 2);
 
-		CheckBox phoenixDataTypeCheckBox = new CheckBox("Phoenix data types converison");
-		cliGrid.add(phoenixDataTypeCheckBox, 0, 2, 4, 1);
+		CheckBox hexConverstionCheckBox = new CheckBox("Result as HEX");
+		cliGrid.add(hexConverstionCheckBox, 0, 2, 4, 1);
 
 		cliGrid.add(commandTableView, 0, 3, 5, 5);
 
@@ -215,7 +215,7 @@ public class MainApp extends Application {
 
 				@Override
 				protected String call() throws Exception {
-					String res = CommandModel.submitQuery(commandTextArea.getText());
+					String res = CommandModel.submitQuery(commandTextArea.getText(), hexConverstionCheckBox.isSelected());
 					Platform.runLater(() -> {
 						if (res != null) {
 							errorDialogFactory("Error submitting command", "There is some issue with command", res);

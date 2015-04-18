@@ -210,16 +210,13 @@ public class CreateTableDialog {
 						presplitsBytes = new byte[presplitsCountInt][];
 						BigInteger step = (start.subtract(end)).divide(new BigInteger(presplitsCount)).add(new BigInteger("1"));
 						BigInteger iterating = start;
-						System.out.println("iteration begin:");
 						for (int i = 0; i < presplitsCountInt; i++) {
 							iterating = iterating.add(step);
 							if (iterating.toByteArray()[0] == 0) { //first bit is only for sign and hence is added whole byte
 								presplitsBytes[i] = Arrays.copyOfRange(iterating.toByteArray(), 1, iterating.toByteArray().length);
 							} else {
 								presplitsBytes[i] = iterating.toByteArray();
-
 							}
-							System.out.println(Arrays.toString(iterating.toByteArray()));
 						}
 					}
 				} catch (NumberFormatException e) {
