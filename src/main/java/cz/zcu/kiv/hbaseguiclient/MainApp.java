@@ -4,6 +4,13 @@ import com.google.common.base.Throwables;
 import cz.zcu.kiv.hbaseguiclient.model.AppContext;
 import cz.zcu.kiv.hbaseguiclient.model.CommandModel;
 import cz.zcu.kiv.hbaseguiclient.model.TableRowDataModel;
+import java.io.IOException;
+import java.nio.file.FileAlreadyExistsException;
+import java.nio.file.Files;
+import java.nio.file.Paths;
+import java.nio.file.StandardOpenOption;
+import java.util.ArrayList;
+import java.util.concurrent.atomic.AtomicBoolean;
 import javafx.application.Application;
 import static javafx.application.Application.launch;
 import javafx.application.Platform;
@@ -48,6 +55,7 @@ public class MainApp extends Application {
 	Scene scene;
 	AppContext appContext;
 	TableView commandTableView = getCommandTableView();
+	public static final String CLUSTER_CONFIG_NAME = "known_cluster.cfg";
 
 	/**
 	 * failover for true java fx apps
@@ -64,6 +72,7 @@ public class MainApp extends Application {
 		appContext = new AppContext();
 
 		createGui(stage);
+		connectToKnownClusters();
 		createHeader();
 		createClustersTreeView();
 		createCli();
@@ -116,8 +125,8 @@ public class MainApp extends Application {
 		grid.add(new Label("Zookeeper connection:"), 0, 1);
 		grid.add(zk, 1, 1);
 
-		ButtonType loginButtonType = new ButtonType("Connect", ButtonBar.ButtonData.OK_DONE);
-		dialog.getDialogPane().getButtonTypes().addAll(loginButtonType, ButtonType.CANCEL);
+		ButtonType connectButtonType = new ButtonType("Connect", ButtonBar.ButtonData.OK_DONE);
+		dialog.getDialogPane().getButtonTypes().addAll(connectButtonType, ButtonType.CANCEL);
 
 		dialog.getDialogPane().setContent(grid);
 
@@ -134,6 +143,7 @@ public class MainApp extends Application {
 				errorDialogFactory("Error, cant connect", "Cannot connect to cluster", err);
 				root.setLeft(currentLeft);
 			} else {
+				addClusterToConfigFileIfNotPresent(res, result.getKey());
 				appContext.refreshTables(res, (suc, ex) -> {
 					if (suc == true) {
 						createClustersTreeView();
@@ -154,32 +164,34 @@ public class MainApp extends Application {
 	}
 
 	private void createClustersTreeView() {
-		TreeView clustersTreeView = new TreeView();
-		TreeItem<String> rootTreeItem = new TreeItem<>("unshowable root");
+		Platform.runLater(() -> {
+			TreeView clustersTreeView = new TreeView();
+			TreeItem<String> rootTreeItem = new TreeItem<>("unshowable root");
 
-		appContext.getClusterTables().forEach((cluster, namespaceTablesMap) -> {
-			TreeItem<String> clusterTreeItem = new TreeItem(cluster);
+			appContext.getClusterTables().forEach((cluster, namespaceTablesMap) -> {
+				TreeItem<String> clusterTreeItem = new TreeItem(cluster);
 
-			namespaceTablesMap.forEach((namespace, tableList) -> {
-				TreeItem<String> namespaceTreeItem = new TreeItem<>(namespace);
-				namespaceTreeItem.setExpanded(true);
+				namespaceTablesMap.forEach((namespace, tableList) -> {
+					TreeItem<String> namespaceTreeItem = new TreeItem<>(namespace);
+					namespaceTreeItem.setExpanded(true);
 
-				tableList.forEach(tableName -> {
-					TreeItem<String> tableTreeItem = new TreeItem<>(tableName);
-					tableTreeItem.setExpanded(true);
-					namespaceTreeItem.getChildren().add(tableTreeItem);
+					tableList.forEach(tableName -> {
+						TreeItem<String> tableTreeItem = new TreeItem<>(tableName);
+						tableTreeItem.setExpanded(true);
+						namespaceTreeItem.getChildren().add(tableTreeItem);
+					});
+
+					clusterTreeItem.getChildren().add(namespaceTreeItem);
 				});
 
-				clusterTreeItem.getChildren().add(namespaceTreeItem);
+				clusterTreeItem.setExpanded(true);
+				rootTreeItem.getChildren().add(clusterTreeItem);
 			});
 
-			clusterTreeItem.setExpanded(true);
-			rootTreeItem.getChildren().add(clusterTreeItem);
+			clustersTreeView.setRoot(rootTreeItem);
+			clustersTreeView.setShowRoot(false);
+			root.setLeft(clustersTreeView);
 		});
-
-		clustersTreeView.setRoot(rootTreeItem);
-		clustersTreeView.setShowRoot(false);
-		root.setLeft(clustersTreeView);
 	}
 
 	private void createCli() {
@@ -244,7 +256,7 @@ public class MainApp extends Application {
 		commandTableView.getColumns().clear();
 
 		//add rowKey column
-		TableColumn<TableRowDataModel, String> rowKeyColumn = new TableColumn<>("Row key (immutable)");
+		TableColumn<TableRowDataModel, String> rowKeyColumn = new TableColumn<>("Row key");
 		rowKeyColumn.setCellValueFactory(c -> {
 			return new SimpleStringProperty(c.getValue().getRowKey());
 		});
@@ -275,6 +287,60 @@ public class MainApp extends Application {
 		});
 
 		commandTableView.setItems(tableData);
+	}
+
+	private void connectToKnownClusters() {
+		ProgressIndicator pi = new ProgressIndicator();
+		root.setLeft(pi);
+
+		try {
+			java.nio.file.Files.lines(Paths.get(System.getProperty("user.dir"), CLUSTER_CONFIG_NAME)).forEach(line -> {
+				String[] aliasAndZk = line.split("\t");
+				String alias = aliasAndZk[0];
+				String zk = aliasAndZk[1];
+
+				appContext.createConnection(zk, alias, (err, finalAlias) -> {
+					appContext.refreshTables(finalAlias, (suc, ex) -> {
+						if (suc == true) {
+							createClustersTreeView();
+						}
+					});
+				});
+			});
+		} catch (IOException ex) {
+			createClustersTreeView();
+			System.out.println("clusters config file not found or err: " + ex);
+		}
+	}
+
+	private void addClusterToConfigFileIfNotPresent(String newAlias, String newZk) {
+		try {
+			java.nio.file.Path configPath = Paths.get(System.getProperty("user.dir"), CLUSTER_CONFIG_NAME);
+			try {
+				Files.createFile(configPath);
+			} catch (FileAlreadyExistsException e) {
+				//do nothing
+			}
+
+			AtomicBoolean add = new AtomicBoolean(true);
+			java.nio.file.Files.lines(configPath).forEach(line -> {
+				String[] aliasAndZk = line.split("\t");
+				String alias = aliasAndZk[0];
+				String zk = aliasAndZk[1];
+
+				if (alias.equals(newAlias) && zk.equals(newZk)) {
+					add.set(false);
+				}
+			});
+			if (add.get() == true) {
+				ArrayList<String> newLine = new ArrayList<>();
+				newLine.add(newAlias + "\t" + newZk);
+				java.nio.file.Files.write(configPath, newLine, StandardOpenOption.APPEND);
+			}
+		} catch (IOException ex) {
+			System.out.println("Something went wrong:");
+			ex.printStackTrace();
+		}
 	}
 
 }

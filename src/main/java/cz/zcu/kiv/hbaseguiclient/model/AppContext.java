@@ -27,7 +27,7 @@ public class AppContext {
 			return;
 		}
 
-		Platform.runLater(() -> {
+		new Thread(() -> {
 			Configuration conf = new Configuration();
 			conf.set("hbase.zookeeper.quorum", zk);
 			conf.set("zookeeper.session.timeout", "6000");
@@ -58,7 +58,7 @@ public class AppContext {
 			} catch (IOException e) {
 				callback.accept(Throwables.getStackTraceAsString(e), null);
 			}
-		});
+		}).start();
 	}
 
 	public void refreshTables(String clusterName, BiConsumer<Boolean, Exception> callback) {
