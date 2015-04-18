@@ -86,7 +86,6 @@ public class CommandModel {
 	private static void execScan(String cluster, String table, String start, String skip, String limit) throws IOException {
 		Scan scan = new Scan();
 		scan.setCaching(60);
-//		scan.setBatch(100);
 		scan.setMaxResultSize(1 * 1024 * 1024); //1MB
 
 		if (start != null) {

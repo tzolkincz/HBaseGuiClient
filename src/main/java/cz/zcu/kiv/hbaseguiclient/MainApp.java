@@ -44,6 +44,9 @@ import javafx.stage.Stage;
 import javafx.scene.control.TreeItem;
 import javafx.scene.control.TreeView;
 import javafx.scene.control.cell.TextFieldTableCell;
+import javafx.scene.input.KeyCode;
+import javafx.scene.input.KeyCodeCombination;
+import javafx.scene.input.KeyCombination;
 import javafx.scene.input.MouseEvent;
 import javafx.scene.layout.GridPane;
 import javafx.scene.text.Text;
@@ -207,6 +210,11 @@ public class MainApp extends Application {
 
 		Button submitCommandButton = new Button("Execute command");
 		submitCommandButton.setAlignment(Pos.CENTER_RIGHT);
+		scene.getAccelerators().put(
+				new KeyCodeCombination(KeyCode.ENTER, KeyCombination.CONTROL_DOWN), () -> {
+					submitCommandButton.fire();
+				});
+
 		submitCommandButton.setOnAction(a -> {
 			ProgressIndicator pi = new ProgressIndicator();
 			cliGrid.add(pi, 0, 3, 5, 5);
