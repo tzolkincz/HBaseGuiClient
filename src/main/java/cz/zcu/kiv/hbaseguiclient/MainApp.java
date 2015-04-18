@@ -30,7 +30,10 @@ import javafx.scene.input.KeyCodeCombination;
 import javafx.scene.input.KeyCombination;
 import javafx.scene.input.MouseEvent;
 import javafx.scene.layout.GridPane;
+import javafx.scene.text.Font;
 import javafx.scene.text.Text;
+import javafx.scene.text.TextBoundsType;
+import javafx.scene.text.TextFlow;
 import javafx.util.Pair;
 
 public class MainApp extends Application {
@@ -60,6 +63,7 @@ public class MainApp extends Application {
 		createHeader();
 		createClustersTreeView();
 		createCli();
+		createHelp();
 	}
 
 	private void createGui(Stage stage) {
@@ -191,6 +195,8 @@ public class MainApp extends Application {
 
 	private void createCli() {
 		GridPane cliGrid = new GridPane();
+		cliGrid.setPrefWidth(1000);
+		cliGrid.setPadding(new Insets(13));
 
 		TextArea commandTextArea = new TextArea("scan table");
 		cliGrid.add(commandTextArea, 0, 0, 5, 2);
@@ -201,6 +207,8 @@ public class MainApp extends Application {
 		cliGrid.add(commandTableView, 0, 3, 5, 5);
 
 		Button submitCommandButton = new Button("Execute command");
+		submitCommandButton.setPadding(new Insets(5));
+		
 		submitCommandButton.setAlignment(Pos.CENTER_RIGHT);
 		scene.getAccelerators().put(
 				new KeyCodeCombination(KeyCode.ENTER, KeyCombination.CONTROL_DOWN), () -> {
@@ -235,9 +243,6 @@ public class MainApp extends Application {
 
 		});
 		cliGrid.add(submitCommandButton, 4, 2);
-
-		cliGrid.setGridLinesVisible(true);
-
 		root.setCenter(cliGrid);
 	}
 
@@ -311,6 +316,26 @@ public class MainApp extends Application {
 			createClustersTreeView();
 			System.out.println("clusters config file not found or err: " + ex);
 		}
+	}
+
+	private void createHelp() {
+		Text helpHeadline = new Text("Quick Guide\n");
+		helpHeadline.setFont(new Font(29));
+
+		helpHeadline.setLineSpacing(30);
+
+		Text lorem = new Text("Praesent dictum magna at ultricies mollis. Etiam vel purus non justo vestibulum viverra. Sed elementum enim vitae ex vulputate, at vehicula nisi porttitor. Maecenas fermentum non nunc sit amet egestas. Cras et pellentesque mi. Sed at sollicitudin lectus. Ut quis porta nisl. Aenean mattis dolor ligula, eu semper erat rutrum at. Nam ullamcorper, nisl id iaculis tincidunt, ex quam fringilla est, a cursus diam eros eu ipsum. Proin viverra leo sit amet vestibulum feugiat. Pellentesque vehicula dui vel lacus sollicitudin vulputate. Suspendisse potenti. Proin mauris mi, facilisis non mi interdum, sodales semper nunc. Aenean id ultrices diam. Maecenas quis convallis tellus, eget porta ex. Nulla facilisi. ");
+//		lorem.setWrappingWidth(scene.getWidth() / 4);
+
+		TextFlow helpTextFlow = new TextFlow(helpHeadline, lorem);
+
+//		helpTextFlow.setLineSpacing(30);
+
+//		helpTextFlow.setMaxWidth(300);
+
+		helpTextFlow.setPadding(new Insets(20));
+		helpTextFlow.setPrefWidth(300);
+		root.setRight(helpTextFlow);
 	}
 
 }
