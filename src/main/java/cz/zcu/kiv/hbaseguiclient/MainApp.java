@@ -5,12 +5,8 @@ import cz.zcu.kiv.hbaseguiclient.model.AppContext;
 import cz.zcu.kiv.hbaseguiclient.model.CommandModel;
 import cz.zcu.kiv.hbaseguiclient.model.TableRowDataModel;
 import java.io.IOException;
-import java.nio.file.FileAlreadyExistsException;
-import java.nio.file.Files;
 import java.nio.file.Paths;
-import java.nio.file.StandardOpenOption;
-import java.util.ArrayList;
-import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.Optional;
 import javafx.application.Application;
 import static javafx.application.Application.launch;
 import javafx.application.Platform;
@@ -23,26 +19,11 @@ import javafx.geometry.Insets;
 import javafx.geometry.Pos;
 import javafx.scene.Node;
 import javafx.scene.Scene;
-import javafx.scene.control.Alert;
+import javafx.scene.control.*;
 import javafx.scene.control.Alert.AlertType;
-import javafx.scene.control.Button;
-import javafx.scene.control.ButtonBar;
-import javafx.scene.control.ButtonType;
-import javafx.scene.control.CheckBox;
-import javafx.scene.control.Dialog;
-import javafx.scene.control.Label;
-import javafx.scene.control.Menu;
-import javafx.scene.control.MenuBar;
-import javafx.scene.control.ProgressIndicator;
-import javafx.scene.control.TableColumn;
 import javafx.scene.control.TableColumn.CellEditEvent;
-import javafx.scene.control.TableView;
-import javafx.scene.control.TextArea;
-import javafx.scene.control.TextField;
 import javafx.scene.layout.BorderPane;
 import javafx.stage.Stage;
-import javafx.scene.control.TreeItem;
-import javafx.scene.control.TreeView;
 import javafx.scene.control.cell.TextFieldTableCell;
 import javafx.scene.input.KeyCode;
 import javafx.scene.input.KeyCodeCombination;
@@ -92,9 +73,12 @@ public class MainApp extends Application {
 
 	private void createHeader() {
 		MenuBar mainMenu = new MenuBar();
+
+		CreateTableDialog createTableDialog = new CreateTableDialog(this, appContext);
+
 		mainMenu.getMenus().addAll(
 				clickableMenuItemFactory("Connect", e -> showConnectPopUp()),
-				clickableMenuItemFactory("Create", e -> CreateTableDialog.showCreatePopUp(appContext)),
+				clickableMenuItemFactory("Create", e -> createTableDialog.showCreatePopUp()),
 				clickableMenuItemFactory("Copy", e -> showConnectPopUp()),
 				clickableMenuItemFactory("Exit", e -> Platform.exit())
 		);
@@ -134,11 +118,19 @@ public class MainApp extends Application {
 		dialog.getDialogPane().setContent(grid);
 
 		dialog.setResultConverter(dialogButton -> {
+			if (dialogButton.getButtonData().isCancelButton()) {
+				return null;
+			}
 			return new Pair<>(zk.getText(), name.getText());
 		});
 
 		Node currentLeft = root.getLeft();
-		Pair<String, String> result = dialog.showAndWait().get();
+
+		Optional<Pair<String, String>> connectionDialogRes = dialog.showAndWait();
+		if (!connectionDialogRes.isPresent()) {
+			return;
+		}
+		Pair<String, String> result = connectionDialogRes.get();
 		ProgressIndicator p1 = new ProgressIndicator();
 		root.setLeft(p1);
 		appContext.createConnection(result.getKey(), result.getValue(), (err, res) -> {
@@ -146,7 +138,7 @@ public class MainApp extends Application {
 				errorDialogFactory("Error, cant connect", "Cannot connect to cluster", err);
 				root.setLeft(currentLeft);
 			} else {
-				addClusterToConfigFileIfNotPresent(res, result.getKey());
+				AppContext.addClusterToConfigFileIfNotPresent(res, result.getKey());
 				appContext.refreshTables(res, (suc, ex) -> {
 					if (suc == true) {
 						createClustersTreeView();
@@ -158,7 +150,7 @@ public class MainApp extends Application {
 		});
 	}
 
-	private void errorDialogFactory(String title, String header, String msg) {
+	public void errorDialogFactory(String title, String header, String msg) {
 		Alert alert = new Alert(AlertType.ERROR);
 		alert.setTitle(title);
 		alert.setHeaderText(header);
@@ -166,7 +158,7 @@ public class MainApp extends Application {
 		alert.showAndWait();
 	}
 
-	private void createClustersTreeView() {
+	public void createClustersTreeView() {
 		Platform.runLater(() -> {
 			TreeView clustersTreeView = new TreeView();
 			TreeItem<String> rootTreeItem = new TreeItem<>("unshowable root");
@@ -318,36 +310,6 @@ public class MainApp extends Application {
 		} catch (IOException ex) {
 			createClustersTreeView();
 			System.out.println("clusters config file not found or err: " + ex);
-		}
-	}
-
-	private void addClusterToConfigFileIfNotPresent(String newAlias, String newZk) {
-		try {
-			java.nio.file.Path configPath = Paths.get(System.getProperty("user.dir"), CLUSTER_CONFIG_NAME);
-			try {
-				Files.createFile(configPath);
-			} catch (FileAlreadyExistsException e) {
-				//do nothing
-			}
-
-			AtomicBoolean add = new AtomicBoolean(true);
-			java.nio.file.Files.lines(configPath).forEach(line -> {
-				String[] aliasAndZk = line.split("\t");
-				String alias = aliasAndZk[0];
-				String zk = aliasAndZk[1];
-
-				if (alias.equals(newAlias) && zk.equals(newZk)) {
-					add.set(false);
-				}
-			});
-			if (add.get() == true) {
-				ArrayList<String> newLine = new ArrayList<>();
-				newLine.add(newAlias + "\t" + newZk);
-				java.nio.file.Files.write(configPath, newLine, StandardOpenOption.APPEND);
-			}
-		} catch (IOException ex) {
-			System.out.println("Something went wrong:");
-			ex.printStackTrace();
 		}
 	}
 

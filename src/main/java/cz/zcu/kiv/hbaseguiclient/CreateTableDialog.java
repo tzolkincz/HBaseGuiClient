@@ -1,12 +1,17 @@
 package cz.zcu.kiv.hbaseguiclient;
 
 import cz.zcu.kiv.hbaseguiclient.model.AppContext;
+import java.math.BigInteger;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 import java.util.Optional;
 import java.util.concurrent.atomic.AtomicInteger;
+import javafx.application.Platform;
 import javafx.beans.property.ReadOnlyBooleanProperty;
+import javafx.collections.ObservableList;
 import javafx.geometry.Insets;
+import javafx.scene.Node;
 import javafx.scene.control.ButtonBar;
 import javafx.scene.control.ButtonType;
 import javafx.scene.control.CheckBox;
@@ -22,6 +27,14 @@ import javafx.scene.layout.BorderWidths;
 import javafx.scene.layout.CornerRadii;
 import javafx.scene.layout.GridPane;
 import javafx.scene.paint.Color;
+import javax.xml.bind.DatatypeConverter;
+import org.apache.hadoop.hbase.HColumnDescriptor;
+import org.apache.hadoop.hbase.HTableDescriptor;
+import org.apache.hadoop.hbase.TableName;
+import org.apache.hadoop.hbase.io.compress.Compression;
+import org.apache.hadoop.hbase.io.encoding.DataBlockEncoding;
+import org.apache.hadoop.hbase.regionserver.BloomType;
+import org.apache.hadoop.hbase.util.Triple;
 
 public class CreateTableDialog {
 
@@ -29,14 +42,24 @@ public class CreateTableDialog {
 	static List<TextField> cfNamesList = new ArrayList<>();
 	static int cfPropertiesHeight = 4;
 	static int cfPropertiesOffset = 3;
+	static List<GridPane> cfPanes;
+	private final AppContext appContext;
+	private final MainApp mainGui;
+	private ObservableList<Node> cfDynamicNodes;
 
-	private static GridPane cfPropertiesFactory(GridPane grid) {
+	CreateTableDialog(MainApp mainGui, AppContext appContext) {
+		this.appContext = appContext;
+		this.mainGui = mainGui;
+		cfPanes = new ArrayList<>();
+	}
+
+	private GridPane cfPropertiesFactory(GridPane grid) {
 		GridPane cfGrid = new GridPane();
 		cfGrid.setHgap(5);
 		cfGrid.setVgap(10);
 		cfGrid.setPadding(new Insets(20, 150, 10, 10));
-		cfGrid.setBorder(new Border(
-				new BorderStroke(Color.GRAY, BorderStrokeStyle.SOLID, new CornerRadii(15), BorderWidths.DEFAULT)));
+		cfGrid.setBorder(new Border(new BorderStroke(
+				Color.GRAY, BorderStrokeStyle.SOLID, new CornerRadii(15), BorderWidths.DEFAULT)));
 
 		TextField cf = new TextField();
 		cf.setPromptText("cf");
@@ -110,12 +133,13 @@ public class CreateTableDialog {
 		CheckBox inMemoryCheckBox = new CheckBox();
 		cfGrid.add(new Label("In memory"), 2, 4);
 		cfGrid.add(inMemoryCheckBox, 3, 4);
-		
+
+		cfPanes.add(cfGrid);
 		return cfGrid;
 	}
 
-	public static void showCreatePopUp(AppContext appContext) {
-		Dialog<List<String>> dialog = new Dialog<>();
+	public void showCreatePopUp() {
+		Dialog<Triple<String, HTableDescriptor, byte[][]>> dialog = new Dialog<>();
 		dialog.setTitle("Create new table");
 		GridPane grid = new GridPane();
 		grid.setHgap(10);
@@ -124,7 +148,7 @@ public class CreateTableDialog {
 
 		TextField name = new TextField();
 		name.setPromptText("my_table");
-		grid.add(new Label("Table name:"), 0, 0);
+		grid.add(new Label("Table name:*"), 0, 0);
 		grid.add(name, 1, 0);
 
 		TextField namespace = new TextField();
@@ -166,13 +190,111 @@ public class CreateTableDialog {
 		dialog.getDialogPane().setContent(scrollPane);
 
 		dialog.setResultConverter(dialogButton -> {
-			List<String> ret = new ArrayList<>();
-			ret.add(name.getText());
-			return ret;
+			if (dialogButton.getButtonData().isCancelButton()) {
+				return null;
+			}
+
+			//dealing with presplits
+			String presplitsCount = presplits.getText();
+			byte[][] presplitsBytes = null;
+			if (!presplitsCount.isEmpty()) {
+				try {
+					int presplitsCountInt = Integer.parseInt(presplitsCount) - 1; //one presplit is allready there
+					BigInteger start = new BigInteger(-1, DatatypeConverter.parseHexBinary(startKey.getText()));
+					BigInteger end = new BigInteger(-1, DatatypeConverter.parseHexBinary(endKey.getText()));
+
+					if (end.compareTo(start) > 0) {
+						mainGui.errorDialogFactory("Presplit format exception", "Presplits error", "End key must be above start key");
+						return null;
+					} else {
+						presplitsBytes = new byte[presplitsCountInt][];
+						BigInteger step = (start.subtract(end)).divide(new BigInteger(presplitsCount)).add(new BigInteger("1"));
+						BigInteger iterating = start;
+						System.out.println("iteration begin:");
+						for (int i = 0; i < presplitsCountInt; i++) {
+							iterating = iterating.add(step);
+							if (iterating.toByteArray()[0] == 0) { //first bit is only for sign and hence is added whole byte
+								presplitsBytes[i] = Arrays.copyOfRange(iterating.toByteArray(), 1, iterating.toByteArray().length);
+							} else {
+								presplitsBytes[i] = iterating.toByteArray();
+
+							}
+							System.out.println(Arrays.toString(iterating.toByteArray()));
+						}
+					}
+				} catch (NumberFormatException e) {
+					mainGui.errorDialogFactory("Presplit format exception", "Presplits error", "Presplits can be only valid HEX numbers");
+					return null;
+				}
+			}
+
+			String tableNameString = name.getText();
+			if (tableNameString.isEmpty()) {
+				mainGui.errorDialogFactory("Table creation exception", "Empty table name", "Table name must not be empty");
+				return null;
+			}
+
+			HTableDescriptor descriptor = new HTableDescriptor(TableName.valueOf(tableNameString));
+
+			for (GridPane cfGrid : cfPanes) {
+				ObservableList<Node> cfNodes = cfGrid.getChildren();
+				setDynamicCFNodesList(cfNodes);
+
+				String cfName = getCFOption(1);
+				if (cfName.isEmpty()) {
+					continue;
+				}
+
+				HColumnDescriptor cf = new HColumnDescriptor(cfName);
+				cf.setDataBlockEncoding(DataBlockEncoding.valueOf(((ChoiceBox<String>) cfNodes.get(3)).getValue()));
+				cf.setBloomFilterType(BloomType.valueOf(((ChoiceBox<String>) cfNodes.get(11)).getValue()));
+				cf.setCompressionType(Compression.Algorithm.valueOf(((ChoiceBox<String>) cfNodes.get(13)).getValue()));
+				cf.setInMemory(((CheckBox) cfNodes.get(15)).isSelected());
+
+				//set ioptional fields
+				if (!getCFOption(5).isEmpty()) {
+					cf.setMaxVersions(Integer.parseInt(getCFOption(5)));
+				}
+				if (!getCFOption(7).isEmpty()) {
+					cf.setMinVersions(Integer.parseInt(getCFOption(7)));
+				}
+				if (!getCFOption(9).isEmpty()) {
+					cf.setTimeToLive(Integer.parseInt(getCFOption(9)));
+				}
+				descriptor.addFamily(cf);
+			}
+			if (descriptor.getFamilies().isEmpty()) {
+				mainGui.errorDialogFactory("Table creation exception", "No column family specified", "Table must contain at least one cf");
+				return null;
+			}
+
+			return new Triple<>(atCluster.getValue(), descriptor, presplitsBytes);
 		});
 
-		Optional<List<String>> result = dialog.showAndWait();
-		result.ifPresent(System.out::println);
+		Optional<Triple<String, HTableDescriptor, byte[][]>> pureResult = dialog.showAndWait();
+		if (pureResult.isPresent()) {
+			Triple<String, HTableDescriptor, byte[][]> res = pureResult.get();
+
+			appContext.createTable(res.getFirst(), res.getSecond(), res.getThird(), err -> {
+				Platform.runLater(() -> {
+					if (err != null) {
+						mainGui.errorDialogFactory("Error, cant create table", "Table cannot be created", err);
+					} else {
+						appContext.refreshTables(res.getFirst(), (suc, ex) -> {
+							mainGui.createClustersTreeView();
+						});
+					}
+				});
+			});
+		}
+	}
+
+	private void setDynamicCFNodesList(ObservableList<Node> cfNodes) {
+		this.cfDynamicNodes = cfNodes;
+	}
+
+	private String getCFOption(int index) {
+		return ((TextField) cfDynamicNodes.get(index)).getText();
 	}
 
 }

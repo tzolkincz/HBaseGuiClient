@@ -1,13 +1,22 @@
 package cz.zcu.kiv.hbaseguiclient.model;
 
 import com.google.common.base.Throwables;
+import static cz.zcu.kiv.hbaseguiclient.MainApp.CLUSTER_CONFIG_NAME;
 import java.io.IOException;
+import java.nio.file.FileAlreadyExistsException;
+import java.nio.file.Files;
+import java.nio.file.Paths;
+import java.nio.file.StandardOpenOption;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.BiConsumer;
+import java.util.function.Consumer;
+import java.util.logging.Level;
+import java.util.logging.Logger;
 import javafx.application.Platform;
 import javafx.util.Pair;
 import org.apache.hadoop.conf.Configuration;
@@ -43,7 +52,7 @@ public class AppContext {
 
 				//determine cluster name if not present
 				String clusterAlias;
-				if (clusterName == null) {
+				if (clusterName == null || clusterName.isEmpty()) {
 					if (zk.length() > 20) {
 						clusterAlias = zk.substring(0, 18).concat("...");
 					} else {
@@ -89,4 +98,45 @@ public class AppContext {
 		return clusterTables;
 	}
 
+	public static void addClusterToConfigFileIfNotPresent(String newAlias, String newZk) {
+		try {
+			java.nio.file.Path configPath = Paths.get(System.getProperty("user.dir"), CLUSTER_CONFIG_NAME);
+			try {
+				Files.createFile(configPath);
+			} catch (FileAlreadyExistsException e) {
+				//do nothing
+			}
+
+			AtomicBoolean add = new AtomicBoolean(true);
+			java.nio.file.Files.lines(configPath).forEach(line -> {
+				String[] aliasAndZk = line.split("\t");
+				String alias = aliasAndZk[0];
+				String zk = aliasAndZk[1];
+
+				if (alias.equals(newAlias) && zk.equals(newZk)) {
+					add.set(false);
+				}
+			});
+			if (add.get() == true) {
+				ArrayList<String> newLine = new ArrayList<>();
+				newLine.add(newAlias + "\t" + newZk);
+				java.nio.file.Files.write(configPath, newLine, StandardOpenOption.APPEND);
+			}
+		} catch (IOException ex) {
+			System.out.println("Something went wrong:");
+			ex.printStackTrace();
+		}
+	}
+
+	public void createTable(String cluster, HTableDescriptor descriptor, byte[][] presplits, Consumer<String> callback) {
+		new Thread(() -> {
+			HBaseAdmin admin = getClusterMap().get(cluster).getValue();
+			try {
+				admin.createTable(descriptor, presplits);
+			} catch (IOException ex) {
+				callback.accept(ex.toString());
+			}
+			callback.accept(null);
+		}).start();
+	}
 }
