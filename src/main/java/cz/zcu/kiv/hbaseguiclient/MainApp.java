@@ -30,9 +30,10 @@ import javafx.scene.input.KeyCodeCombination;
 import javafx.scene.input.KeyCombination;
 import javafx.scene.input.MouseEvent;
 import javafx.scene.layout.GridPane;
+import javafx.scene.layout.HBox;
+import javafx.scene.layout.VBox;
 import javafx.scene.text.Font;
 import javafx.scene.text.Text;
-import javafx.scene.text.TextBoundsType;
 import javafx.scene.text.TextFlow;
 import javafx.util.Pair;
 
@@ -194,44 +195,45 @@ public class MainApp extends Application {
 	}
 
 	private void createCli() {
-		GridPane cliGrid = new GridPane();
-		cliGrid.setPrefWidth(1000);
-		cliGrid.setPadding(new Insets(13));
-
 		TextArea commandTextArea = new TextArea("scan table");
-		cliGrid.add(commandTextArea, 0, 0, 5, 2);
+		commandTextArea.setPrefWidth(Double.MAX_VALUE);
 
 		CheckBox hexConverstionCheckBox = new CheckBox("Result as HEX");
-		cliGrid.add(hexConverstionCheckBox, 0, 2, 4, 1);
-
-		cliGrid.add(commandTableView, 0, 3, 5, 5);
 
 		Button submitCommandButton = new Button("Execute command");
-		submitCommandButton.setPadding(new Insets(5));
-		
-		submitCommandButton.setAlignment(Pos.CENTER_RIGHT);
+		submitCommandButton.setPadding(new Insets(8));
+
+		HBox submitLineHBoxWrapper = new HBox(hexConverstionCheckBox, submitCommandButton);
+		submitLineHBoxWrapper.setSpacing(9);
+		submitLineHBoxWrapper.setAlignment(Pos.CENTER_RIGHT);
+
 		scene.getAccelerators().put(
 				new KeyCodeCombination(KeyCode.ENTER, KeyCombination.CONTROL_DOWN), () -> {
 					submitCommandButton.fire();
 				});
 
+		VBox cliBox = new VBox(commandTextArea, submitLineHBoxWrapper, commandTableView);
+		cliBox.setSpacing(6);
+		cliBox.setPadding(new Insets(7));
+		root.setCenter(cliBox);
+
 		submitCommandButton.setOnAction(a -> {
 			ProgressIndicator pi = new ProgressIndicator();
-			cliGrid.add(pi, 0, 3, 5, 5);
+			cliBox.getChildren().add(2, pi);
 
-			final Task<String> t = new Task<String>() {
+			final Task<Void> t = new Task<Void>() {
 
 				@Override
-				protected String call() throws Exception {
+				protected Void call() throws Exception {
 					String res = CommandModel.submitQuery(commandTextArea.getText(), hexConverstionCheckBox.isSelected());
 					Platform.runLater(() -> {
 						if (res != null) {
 							errorDialogFactory("Error submitting command", "There is some issue with command", res);
 						}
-						cliGrid.getChildren().remove(pi);
+						cliBox.getChildren().remove(pi);
 						fillCommandTableViewContent();
 					});
-					return "hovnoto";
+					return null;
 				}
 			};
 
@@ -240,10 +242,7 @@ public class MainApp extends Application {
 			Thread tr = new Thread(t);
 			tr.setDaemon(true);
 			tr.start();
-
 		});
-		cliGrid.add(submitCommandButton, 4, 2);
-		root.setCenter(cliGrid);
 	}
 
 	private TableView<TableRowDataModel> getCommandTableView() {
@@ -330,9 +329,7 @@ public class MainApp extends Application {
 		TextFlow helpTextFlow = new TextFlow(helpHeadline, lorem);
 
 //		helpTextFlow.setLineSpacing(30);
-
 //		helpTextFlow.setMaxWidth(300);
-
 		helpTextFlow.setPadding(new Insets(20));
 		helpTextFlow.setPrefWidth(300);
 		root.setRight(helpTextFlow);
