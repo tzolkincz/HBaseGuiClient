@@ -7,6 +7,8 @@ import cz.zcu.kiv.hbaseguiclient.model.TableRowDataModel;
 import java.io.IOException;
 import java.nio.file.Paths;
 import java.util.Optional;
+import java.util.logging.Level;
+import java.util.logging.Logger;
 import javafx.application.Application;
 import static javafx.application.Application.launch;
 import javafx.application.Platform;
@@ -31,6 +33,7 @@ import javafx.scene.input.KeyCombination;
 import javafx.scene.input.MouseEvent;
 import javafx.scene.layout.GridPane;
 import javafx.scene.layout.HBox;
+import javafx.scene.layout.Pane;
 import javafx.scene.layout.VBox;
 import javafx.scene.text.Font;
 import javafx.scene.text.Text;
@@ -84,7 +87,7 @@ public class MainApp extends Application {
 		mainMenu.getMenus().addAll(
 				clickableMenuItemFactory("Connect", e -> showConnectPopUp()),
 				clickableMenuItemFactory("Create", e -> createTableDialog.showCreatePopUp()),
-				clickableMenuItemFactory("Copy", e -> showConnectPopUp()),
+				//				clickableMenuItemFactory("Copy", e -> showConnectPopUp()),
 				clickableMenuItemFactory("Exit", e -> Platform.exit())
 		);
 		root.setTop(mainMenu);
@@ -277,8 +280,20 @@ public class MainApp extends Application {
 			tableColumn.setCellFactory(TextFieldTableCell.<TableRowDataModel>forTableColumn());
 			tableColumn.setOnEditCommit(
 					(CellEditEvent<TableRowDataModel, String> t) -> {
-						((TableRowDataModel) t.getTableView().getItems().get(t.getTablePosition().getRow()))
-						.setValue(columnName, t.getNewValue());
+						Pane cliNode = (Pane) root.getCenter();
+						ProgressIndicator pi = new ProgressIndicator();
+						cliNode.getChildren().add(2, pi);
+
+						((TableRowDataModel) t.getTableView().getItems().get(
+								t.getTablePosition().getRow())).setValue(columnName, t.getNewValue(), err -> {
+									Platform.runLater(() -> {
+										if (err != null) {
+											errorDialogFactory("Edit error", "Error on row edit", err);
+										}
+										cliNode.getChildren().remove(pi);
+									});
+								});
+
 					});
 			commandTableView.getColumns().add(tableColumn);
 
@@ -323,13 +338,18 @@ public class MainApp extends Application {
 
 		helpHeadline.setLineSpacing(30);
 
-		Text lorem = new Text("Praesent dictum magna at ultricies mollis. Etiam vel purus non justo vestibulum viverra. Sed elementum enim vitae ex vulputate, at vehicula nisi porttitor. Maecenas fermentum non nunc sit amet egestas. Cras et pellentesque mi. Sed at sollicitudin lectus. Ut quis porta nisl. Aenean mattis dolor ligula, eu semper erat rutrum at. Nam ullamcorper, nisl id iaculis tincidunt, ex quam fringilla est, a cursus diam eros eu ipsum. Proin viverra leo sit amet vestibulum feugiat. Pellentesque vehicula dui vel lacus sollicitudin vulputate. Suspendisse potenti. Proin mauris mi, facilisis non mi interdum, sodales semper nunc. Aenean id ultrices diam. Maecenas quis convallis tellus, eget porta ex. Nulla facilisi. ");
-//		lorem.setWrappingWidth(scene.getWidth() / 4);
+		Text lorem = new Text(
+				"\nTIP:\nuse Ctrl+Enter to execute command\n"
+				+ "\n"
+				+ "SCAN USAGE:\n"
+				+ "scan cluster:table start 0F00FFCC0ECB skip 29 limit 199"
+				+ "\n\n"
+				+ "!ACHTUNG!:\n"
+				+ "When using compression parameters please ensure you have enabled particular compression algoritm on destiny cluster.\n\n"
+				+ "TIP:\nyou can edit query results\n\n"
+				+ "TIP:\nyour cluster connections is stored in known_cluster.cfg file");
 
 		TextFlow helpTextFlow = new TextFlow(helpHeadline, lorem);
-
-//		helpTextFlow.setLineSpacing(30);
-//		helpTextFlow.setMaxWidth(300);
 		helpTextFlow.setPadding(new Insets(20));
 		helpTextFlow.setPrefWidth(300);
 		root.setRight(helpTextFlow);

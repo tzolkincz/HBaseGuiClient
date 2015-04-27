@@ -19,6 +19,7 @@ public class CommandModel {
 
 	static Map<String, Map<String, String>> queryResult;
 	static Set<String> columns;
+	public static HTableInterface currentTableInterface;
 
 	public static Map<String, Map<String, String>> getQueryResult() {
 		return queryResult;
@@ -103,6 +104,7 @@ public class CommandModel {
 
 		HConnection connection = AppContext.clusterMap.get(cluster).getKey();
 		HTableInterface tableInterface = connection.getTable(table);
+		currentTableInterface = tableInterface;
 
 		//rowKey cf:cq	value
 		queryResult = new TreeMap<>();
