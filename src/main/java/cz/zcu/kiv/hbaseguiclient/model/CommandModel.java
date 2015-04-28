@@ -6,6 +6,7 @@ import java.util.Map;
 import java.util.Set;
 import java.util.TreeMap;
 import java.util.TreeSet;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import org.apache.hadoop.hbase.client.HConnection;
@@ -30,7 +31,7 @@ public class CommandModel {
 	}
 
 	//@TODO gramatics
-	static Pattern scanPattern = Pattern.compile("\\s*scan\\s+(?<table>[\\w:.]+)(\\s+start\\s+(?<start>[\\w\\s]+))?(\\s+skip\\s+(?<skip>\\d+))?(\\s+limit\\s+(?<limit>\\d+))?\\s*",
+	static Pattern scanPattern = Pattern.compile("\\s*scan\\s+(?<table>[\\w:.]+)(\\s+start\\s+(?<start>[\\w\\s]+))?(\\s+limit\\s+(?<limit>\\d+))?(\\s+skip\\s+(?<skip>\\d+))?\\s*",
 			Pattern.CASE_INSENSITIVE);
 
 	public static String submitQuery(String text, boolean hexConversion) throws IOException {
@@ -93,14 +94,16 @@ public class CommandModel {
 			scan.setStartRow(Bytes.toBytes(start));
 		}
 
-		if (limit == null) {
-			limit = "40";
-		}
-		scan.setFilter(new PageFilter(Integer.parseInt(limit)));
+		int limitInt = 40; //default limit
+		AtomicInteger skipInt = new AtomicInteger(0);
 
 		if (skip != null) {
-			scan.setRowOffsetPerColumnFamily(Integer.parseInt(skip));
+			skipInt.set(Integer.parseInt(skip));
 		}
+		if (limit != null) {
+			limitInt = Integer.parseInt(limit);
+		}
+		scan.setFilter(new PageFilter(limitInt + skipInt.get()));
 
 		HConnection connection = AppContext.clusterMap.get(cluster).getKey();
 		HTableInterface tableInterface = connection.getTable(table);
@@ -114,27 +117,30 @@ public class CommandModel {
 
 		resultScanner.iterator().forEachRemaining(res -> {
 
-			Map<String, String> columnValues = new HashMap<>();
+			if (skipInt.getAndDecrement() <= 0) {
 
-			res.getNoVersionMap().forEach((familyBytes, qualifierValue) -> {
-				String family = Bytes.toString(familyBytes);
-				qualifierValue.forEach((qualifierBytes, valueBytes) -> {
+				Map<String, String> columnValues = new HashMap<>();
 
-					String qualifier = Bytes.toString(qualifierBytes);
-					String value;
-					if (hexConversion) {
-						value = Bytes.toHex(valueBytes);
-					} else {
-						value = Bytes.toString(valueBytes);
-					}
+				res.getNoVersionMap().forEach((familyBytes, qualifierValue) -> {
+					String family = Bytes.toString(familyBytes);
+					qualifierValue.forEach((qualifierBytes, valueBytes) -> {
 
-					columns.add(family + ":" + qualifier);
-					columnValues.put(family + ":" + qualifier, value);
+						String qualifier = Bytes.toString(qualifierBytes);
+						String value;
+						if (hexConversion) {
+							value = Bytes.toHex(valueBytes);
+						} else {
+							value = Bytes.toString(valueBytes);
+						}
+
+						columns.add(family + ":" + qualifier);
+						columnValues.put(family + ":" + qualifier, value);
+					});
 				});
-			});
 
-			String rk = Bytes.toString(res.getRow());
-			queryResult.put(rk, columnValues);
+				String rk = Bytes.toString(res.getRow());
+				queryResult.put(rk, columnValues);
+			}
 		});
 	}
 

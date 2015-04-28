@@ -219,7 +219,7 @@ public class CreateTableDialog {
 							}
 						}
 					}
-				} catch (NumberFormatException e) {
+				} catch (IllegalArgumentException e) {
 					mainGui.errorDialogFactory("Presplit format exception", "Presplits error", "Presplits can be only valid HEX numbers");
 					return null;
 				}

@@ -223,6 +223,7 @@ public class MainApp extends Application {
 		submitCommandButton.setOnAction(a -> {
 			ProgressIndicator pi = new ProgressIndicator();
 			cliBox.getChildren().add(2, pi);
+			submitCommandButton.setDisable(true);
 
 			final Task<Void> t = new Task<Void>() {
 
@@ -235,12 +236,11 @@ public class MainApp extends Application {
 						}
 						cliBox.getChildren().remove(pi);
 						fillCommandTableViewContent();
+						submitCommandButton.setDisable(false);
 					});
 					return null;
 				}
 			};
-
-			submitCommandButton.disableProperty().bind(t.runningProperty());
 
 			Thread tr = new Thread(t);
 			tr.setDaemon(true);
@@ -342,12 +342,14 @@ public class MainApp extends Application {
 				"\nTIP:\nuse Ctrl+Enter to execute command\n"
 				+ "\n"
 				+ "SCAN USAGE:\n"
-				+ "scan cluster:table start 0F00FFCC0ECB skip 29 limit 199"
+				+ "scan cluster:table [start 0F00FFCC0ECB] [limit 199] [skip 29]"
 				+ "\n\n"
 				+ "!ACHTUNG!:\n"
 				+ "When using compression parameters please ensure you have enabled particular compression algoritm on destiny cluster.\n\n"
 				+ "TIP:\nyou can edit query results\n\n"
-				+ "TIP:\nyour cluster connections is stored in known_cluster.cfg file");
+				+ "TIP:\nyour cluster connections is stored in  " + CLUSTER_CONFIG_NAME + " file"
+				+ "\n\n"
+				+ "INFO:\nnamespaces are not supported by HBase 0.98.x");
 
 		TextFlow helpTextFlow = new TextFlow(helpHeadline, lorem);
 		helpTextFlow.setPadding(new Insets(20));
