@@ -138,7 +138,12 @@ public class CommandModel {
 					});
 				});
 
-				String rk = Bytes.toString(res.getRow());
+				String rk;
+				if (hexConversion) {
+					rk = Bytes.toHex(res.getRow());
+				} else {
+					rk = Bytes.toString(res.getRow());
+				}
 				queryResult.put(rk, columnValues);
 			}
 		});

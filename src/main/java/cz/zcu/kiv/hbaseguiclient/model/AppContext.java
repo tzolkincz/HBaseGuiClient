@@ -15,8 +15,6 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.BiConsumer;
 import java.util.function.Consumer;
-import java.util.logging.Level;
-import java.util.logging.Logger;
 import javafx.application.Platform;
 import javafx.util.Pair;
 import org.apache.hadoop.conf.Configuration;
@@ -50,24 +48,25 @@ public class AppContext {
 				HConnection connection = HConnectionManager.createConnection(conf);
 				HBaseAdmin admin = new HBaseAdmin(conf);
 
-				//determine cluster name if not present
-				String clusterAlias;
-				if (clusterName == null || clusterName.isEmpty()) {
-					if (zk.length() > 20) {
-						clusterAlias = zk.substring(0, 18).concat("...");
-					} else {
-						clusterAlias = zk;
-					}
-				} else {
-					clusterAlias = clusterName;
-				}
-
+				String clusterAlias = getUnifiedClusterAlias(clusterName, zk);
 				clusterMap.put(clusterAlias, new Pair<>(connection, admin));
 				callback.accept(null, clusterAlias);
 			} catch (IOException e) {
+				clusterMap.remove(getUnifiedClusterAlias(clusterName, zk));
 				callback.accept(Throwables.getStackTraceAsString(e), null);
 			}
 		}).start();
+	}
+
+	private String getUnifiedClusterAlias(String clusterName, String zk) {
+		if (clusterName == null || clusterName.isEmpty()) {
+			if (zk.length() > 20) {
+				return zk.substring(0, 18).concat("...");
+			} else {
+				return zk;
+			}
+		}
+		return clusterName;
 	}
 
 	public void refreshTables(String clusterName, BiConsumer<Boolean, Exception> callback) {

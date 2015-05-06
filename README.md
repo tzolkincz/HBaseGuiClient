@@ -7,6 +7,9 @@ mvn package
 
 java -jar _target_package_
 
+####supported hbase version
+hbase 0.98
+
 
 ###Features###
 create table with presplits and usefull options
