@@ -72,7 +72,9 @@ public class MainApp extends Application {
 
 	private void createGui(Stage stage) {
 		root = new BorderPane();
-		scene = new Scene(root);
+		root.setPrefWidth(1000);
+		root.setPrefHeight(600);
+		scene = new Scene(root, 1000, 600);
 
 		stage.setTitle("HBase Client");
 		stage.setScene(scene);
@@ -328,7 +330,7 @@ public class MainApp extends Application {
 			});
 		} catch (IOException ex) {
 			createClustersTreeView();
-			System.out.println("clusters config file not found or err: " + ex);
+			System.out.println("INFO: clusters config file not found or err: " + ex);
 		}
 	}
 
