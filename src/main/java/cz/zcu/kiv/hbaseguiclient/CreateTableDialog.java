@@ -8,6 +8,7 @@ import java.util.List;
 import java.util.Optional;
 import java.util.concurrent.atomic.AtomicInteger;
 import javafx.application.Platform;
+import javafx.beans.binding.Bindings;
 import javafx.beans.property.ReadOnlyBooleanProperty;
 import javafx.collections.ObservableList;
 import javafx.geometry.Insets;
@@ -126,7 +127,7 @@ public class CreateTableDialog {
 				"LZO",
 				"LZ4",
 				"GZ");
-		compressionChoiceBox.setValue("SNAPPY");
+		compressionChoiceBox.setValue("NONE");
 		cfGrid.add(new Label("Compression"), 2, 3);
 		cfGrid.add(compressionChoiceBox, 3, 3);
 
@@ -139,6 +140,14 @@ public class CreateTableDialog {
 	}
 
 	public void showCreatePopUp() {
+		cfPanes = new ArrayList<>();
+
+		if (appContext.getClusterMap().isEmpty()) {
+			mainGui.errorDialogFactory("Error", "Cluster not connected",
+					"It is necessary to connect to HBase cluster first.");
+			return;
+		}
+
 		Dialog<Triple<String, HTableDescriptor, byte[][]>> dialog = new Dialog<>();
 		dialog.setTitle("Create new table");
 		GridPane grid = new GridPane();
@@ -183,8 +192,14 @@ public class CreateTableDialog {
 
 		grid.add(cfPropertiesFactory(grid), 0, cfPropertiesOffset, 4, 3);
 
-		ButtonType loginButtonType = new ButtonType("Create", ButtonBar.ButtonData.OK_DONE);
-		dialog.getDialogPane().getButtonTypes().addAll(loginButtonType, ButtonType.CANCEL);
+		ButtonType createButtonType = new ButtonType("Create", ButtonBar.ButtonData.OK_DONE);
+		dialog.getDialogPane().getButtonTypes().addAll(createButtonType, ButtonType.CANCEL);
+
+		//disable create if table name not specified
+		Node createButtonNode = dialog.getDialogPane().lookupButton(createButtonType);
+		createButtonNode.disableProperty().bind(
+				Bindings.isEmpty(name.textProperty())
+				.or(Bindings.isEmpty(cfNamesList.get(0).textProperty())));
 
 		ScrollPane scrollPane = new ScrollPane(grid);
 		dialog.getDialogPane().setContent(scrollPane);
@@ -248,6 +263,8 @@ public class CreateTableDialog {
 				cf.setCompressionType(Compression.Algorithm.valueOf(((ChoiceBox<String>) cfNodes.get(13)).getValue()));
 				cf.setInMemory(((CheckBox) cfNodes.get(15)).isSelected());
 
+				System.out.println("Compression: "+((ChoiceBox<String>) cfNodes.get(13)).getValue());
+
 				//set ioptional fields
 				if (!getCFOption(5).isEmpty()) {
 					cf.setMaxVersions(Integer.parseInt(getCFOption(5)));
@@ -271,6 +288,7 @@ public class CreateTableDialog {
 		Optional<Triple<String, HTableDescriptor, byte[][]>> pureResult = dialog.showAndWait();
 		if (pureResult.isPresent()) {
 			Triple<String, HTableDescriptor, byte[][]> res = pureResult.get();
+			cfPanes = new ArrayList<>();
 
 			appContext.createTable(res.getFirst(), res.getSecond(), res.getThird(), err -> {
 				Platform.runLater(() -> {
